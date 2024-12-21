@@ -1,11 +1,111 @@
 import numpy as np
 import sympy as sp
 from matplotlib import pyplot as plt
-from matplotlib import animation
+from matplotlib.animation import FuncAnimation
+
+
+class DisplayGroup:
+    def __init__(self):
+        if displaying_objects_switches['Position']:  # Point particle
+            self.particle, = region.plot(np.array([]), np.array([]), color='#ff9600', marker='o')
+        if displaying_objects_switches['Position vector']:  # Position vector
+            self.position_arrow = Arrow(color='black', line_style='-.')
+        if displaying_objects_switches['Trajectory']:  # Trajectory
+            self.curve, = region.plot(np.array([]), np.array([]), color='#00cccc')
+        if displaying_objects_switches['Curvature radius']:  # Radius of curvature
+            self.curvature_radius, = region.plot(np.array([]), np.array([]), color='pink', lw=3)
+        if displaying_objects_switches['Velocity vector']:  # Velocity vector
+            self.velocity_arrow = Arrow(color='red')
+        if displaying_objects_switches['Total acceleration vector']:  # Acceleration vector
+            self.acceleration_arrow = Arrow(color='purple', line_style=':')
+        if displaying_objects_switches['Tangential acceleration vector']:  # Tangential acceleration vector
+            self.tangential_acceleration_arrow = Arrow(color='#228b22', line_style='--')
+        if displaying_objects_switches['Centripetal acceleration vector']:  # Centripetal acceleration vector
+            self.centripetal_acceleration_arrow = Arrow(color='blue', line_style='--')
+
+    def update(self, x, y, velocity_x, velocity_y, acceleration_x, acceleration_y, tangential_x, tangential_y,
+               centripetal_x, centripetal_y, curvature_radius_x, curvature_radius_y):
+
+        if displaying_objects_switches['Position']:
+            self.particle.set_data(np.array([x[-1]]), np.array([y[-1]]))
+        if displaying_objects_switches['Position vector']:
+            self.position_arrow.update(0, 0, x[-1], y[-1])
+        if displaying_objects_switches['Trajectory']:
+            self.curve.set_data(x, y)
+        if displaying_objects_switches['Curvature radius']:
+            self.curvature_radius.set_data(np.array([x[-1], x[-1] + curvature_radius_x]),
+                                           np.array([y[-1], y[-1] + curvature_radius_y]))
+        if displaying_objects_switches['Velocity vector']:
+            self.velocity_arrow.update(x[-1], y[-1], x[-1] + velocity_x, y[-1] + velocity_y)
+        if displaying_objects_switches['Total acceleration vector']:
+            self.acceleration_arrow.update(x[-1], y[-1], x[-1] + acceleration_x, y[-1] + acceleration_y)
+        if displaying_objects_switches['Tangential acceleration vector']:
+            self.tangential_acceleration_arrow.update(x[-1], y[-1], x[-1] + tangential_x, y[-1] + tangential_y)
+        if displaying_objects_switches['Centripetal acceleration vector']:
+            self.centripetal_acceleration_arrow.update(x[-1], y[-1], x[-1] + centripetal_x, y[-1] + centripetal_y)
+
+    def return_plots(self):
+        plots_for_return = []
+
+        if displaying_objects_switches['Position']:
+            plots_for_return.append(self.particle)
+        if displaying_objects_switches['Position vector']:
+            plots_for_return += [*self.position_arrow.return_plot()]
+        if displaying_objects_switches['Trajectory']:
+            plots_for_return.append(self.curve)
+        if displaying_objects_switches['Curvature radius']:
+            plots_for_return.append(self.curvature_radius)
+        if displaying_objects_switches['Velocity vector']:
+            plots_for_return += [*self.velocity_arrow.return_plot()]
+        if displaying_objects_switches['Total acceleration vector']:
+            plots_for_return += [*self.acceleration_arrow.return_plot()]
+        if displaying_objects_switches['Tangential acceleration vector']:
+            plots_for_return += [*self.tangential_acceleration_arrow.return_plot()]
+        if displaying_objects_switches['Centripetal acceleration vector']:
+            plots_for_return += [*self.centripetal_acceleration_arrow.return_plot()]
+
+        return plots_for_return
+
+    def return_plots_for_legend(self):
+        plots_for_return = []
+
+        if displaying_objects_switches['Position vector']:
+            plots_for_return += [self.position_arrow.return_plot()]
+        if displaying_objects_switches['Curvature radius']:
+            plots_for_return.append(self.curvature_radius)
+        if displaying_objects_switches['Velocity vector']:
+            plots_for_return += [self.velocity_arrow.return_plot()]
+        if displaying_objects_switches['Total acceleration vector']:
+            plots_for_return += [self.acceleration_arrow.return_plot()]
+        if displaying_objects_switches['Tangential acceleration vector']:
+            plots_for_return += [self.tangential_acceleration_arrow.return_plot()]
+        if displaying_objects_switches['Centripetal acceleration vector']:
+            plots_for_return += [self.centripetal_acceleration_arrow.return_plot()]
+
+        return plots_for_return
+
+    @staticmethod
+    def return_names_for_legend():
+        names_for_return = []
+
+        if displaying_objects_switches['Position vector']:
+            names_for_return.append('Радиус-вектор')
+        if displaying_objects_switches['Curvature radius']:
+            names_for_return.append('Радиус кривизны траектории')
+        if displaying_objects_switches['Velocity vector']:
+            names_for_return.append('Вектор скорости')
+        if displaying_objects_switches['Total acceleration vector']:
+            names_for_return.append('Вектор полного ускорения')
+        if displaying_objects_switches['Tangential acceleration vector']:
+            names_for_return.append('Вектор тангенциального ускорения')
+        if displaying_objects_switches['Centripetal acceleration vector']:
+            names_for_return.append('Вектор нормального ускорения')
+
+        return names_for_return
 
 
 class Arrow:
-    """A class for vectors visualization."""
+    """Class for vectors visualization."""
 
     def __init__(self, color='black', line_style='-'):
         self.arrow_template_radii = np.array([0.25, 0, 0.25])
@@ -27,6 +127,14 @@ class Arrow:
         return self.body, self.head
 
 
+def calculate_values(expression: sp.Expr, time_points: np.ndarray) -> np.ndarray:
+    """Calculates values of given expression at given time points."""
+    values = sp.lambdify(t, expression, 'numpy')(time_points)
+    if not isinstance(values, np.ndarray):
+        values = np.full(time_points.size, values)
+    return values
+
+
 def polar_coordinates_to_cartesian(r, fi):
     """Converts polar coordinates to cartesian coordinates."""
     x = r * np.cos(fi)
@@ -34,27 +142,34 @@ def polar_coordinates_to_cartesian(r, fi):
     return x, y
 
 
-def polar_vector_to_cartesian(vector_r, vector_fi, particle_r, particle_fi):
-    """Converts polar vector to cartesian vector."""
-    vector_fi_multiply_particle_r = vector_fi * particle_r
-    particle_fi_sin = np.sin(particle_fi)
-    particle_fi_cos = np.cos(particle_fi)
-    vector_x = vector_r * particle_fi_cos - vector_fi_multiply_particle_r * particle_fi_sin
-    vector_y = vector_r * particle_fi_sin + vector_fi_multiply_particle_r * particle_fi_cos
-    return vector_x, vector_y
+def polar_velocity_to_cartesian(v_r, v_fi, r, fi):
+    """Converts polar velocity to cartesian velocity."""
+    sin = np.sin(fi)
+    cos = np.cos(fi)
+    ratio = v_fi * r
+    vector_x = v_r * cos - ratio * sin
+    vector_y = v_r * sin + ratio * cos
+    velocity = np.sqrt(vector_x ** 2 + vector_y ** 2)
+    return vector_x, vector_y, velocity
 
 
-def calculate_values(expression: sp.Expr, time_points: np.ndarray) -> np.ndarray:
-    """Calculates the values of the given expression
-    at the given time points."""
-    values = sp.lambdify(t, expression, 'numpy')(time_points)
-    if not isinstance(values, np.ndarray):
-        values = np.full(time_points.size, values)
-    return values
+def polar_acceleration_to_cartesian(a_r, a_fi, v_r, v_fi, r, fi):
+    """"Converts polar acceleration to cartesian acceleration."""
+    cos = np.cos(fi)
+    sin = np.sin(fi)
+    v_ratio = 2 * v_r * v_fi
+    c_ratio = r * v_fi ** 2
+    a_ratio = r * a_fi
+    acceleration_x = a_r * cos - v_ratio * sin - c_ratio * cos - a_ratio * sin
+    acceleration_y = a_r * sin + v_ratio * cos - c_ratio * sin + a_ratio * cos
+    acceleration = np.sqrt(acceleration_x ** 2 + acceleration_y ** 2)
+    return acceleration_x, acceleration_y, acceleration
 
 
 def calculate_tangential_acceleration(acceleration_x, acceleration_y, velocity_x, velocity_y):
     """Calculates tangential acceleration."""
+    if velocity_x == velocity_y == 0:
+        return 0, 0, 0
     velocity = np.sqrt(velocity_x ** 2 + velocity_y ** 2)
     tangential = (acceleration_x * velocity_x + acceleration_y * velocity_y) / velocity
     tangential_x = tangential * (velocity_x / velocity)
@@ -62,30 +177,50 @@ def calculate_tangential_acceleration(acceleration_x, acceleration_y, velocity_x
     return tangential_x, tangential_y, tangential
 
 
-def calculate_centripetal_acceleration(tangential, acceleration_x, acceleration_y, velocity_x, velocity_y):
+def calculate_centripetal_acceleration(acceleration_x, acceleration_y, tangential_acceleration_x,
+                                       tangential_acceleration_y):
     """Calculates centripetal acceleration."""
-    orientation = velocity_x * acceleration_y - velocity_y * acceleration_x
-    if orientation == 0:
-        return 0, 0
-    centripetal = np.sqrt(acceleration_x ** 2 + acceleration_y ** 2 - tangential ** 2)
-    velocity = np.sqrt(velocity_x ** 2 + velocity_y ** 2)
-    centripetal_x = -centripetal * (velocity_y / velocity)
-    centripetal_y = centripetal * (velocity_x / velocity)
-    if orientation < 0:
-        centripetal_x *= -1
-        centripetal_y *= -1
-    return centripetal_x, centripetal_y, centripetal
+    centripetal_acceleration_x = acceleration_x - tangential_acceleration_x
+    centripetal_acceleration_y = acceleration_y - tangential_acceleration_y
+    centripetal_acceleration = np.sqrt(centripetal_acceleration_x ** 2 + centripetal_acceleration_y ** 2)
+    return centripetal_acceleration_x, centripetal_acceleration_y, centripetal_acceleration
+
+
+def calculate_curvature_radius(velocity, centripetal_acceleration,
+                               centripetal_acceleration_x, centripetal_acceleration_y):
+    """Calculates curvature radius."""
+    if centripetal_acceleration == 0:
+        return 0, 0, 0
+    curvature_radius = velocity ** 2 / centripetal_acceleration
+    ratio = curvature_radius / centripetal_acceleration
+    curvature_radius_x = ratio * centripetal_acceleration_x
+    curvature_radius_y = ratio * centripetal_acceleration_y
+    return curvature_radius_x, curvature_radius_y, curvature_radius
 
 
 if __name__ == '__main__':
+    # --- Simulation settings ---
 
-    # --- Initial conditions ---
-    MAX_TIME = 30  # Maximum simulation time (seconds)
+    t = sp.Symbol('t')  # Time designation
+    radius: sp.Expr | float | int = sp.cos(t) + 1  # Radius 'r' of particle point as function of time
+    angle: sp.Expr | float | int = t * 5 / 4  # Angle 'fi' of particle point as function of time
+
+    MAX_TIME = 30  # Maximum simulation time
     STEPS = 1000  # Number of steps
 
-    t = sp.Symbol('t')  # The time
-    radius: sp.Expr = sp.cos(t) + 1  # The radius 'r' of the particle point as a function of time
-    angle: sp.Expr = t * 5 / 4  # The angle 'fi' of the particle point as a function of time
+    FPS = 60  # Frames per second
+    displaying_objects_switches = {
+        'Position': True,  # Display marker at point particle position.
+        'Position vector': True,  # Display vector from the origin to point particle position.
+        'Trajectory': True,  # Display curve based on set of points of point particle positions.
+        'Curvature radius': True,  # Display segment that is represents curvature radius.
+        'Velocity vector': True,  # Display vector of point particle velocity.
+        'Total acceleration vector': True,  # Display vector of point particle total acceleration.
+        'Tangential acceleration vector': True,  # Display vector of point particle tangential acceleration.
+        'Centripetal acceleration vector': True  # Display vector of point particle centripetal acceleration.
+    }
+
+    # --- Calculations ---
 
     velocity_radius = sp.diff(radius, t)
     velocity_angle = sp.diff(angle, t)
@@ -93,7 +228,6 @@ if __name__ == '__main__':
     acceleration_radius = sp.diff(velocity_radius, t)
     acceleration_angle = sp.diff(velocity_angle, t)
 
-    # --- Calculations ---
     time_points = np.linspace(start=0, stop=MAX_TIME, num=STEPS)
 
     radius_values = calculate_values(radius, time_points)
@@ -110,79 +244,45 @@ if __name__ == '__main__':
     region = window.add_subplot(1, 1, 1)
     region.set_title("Вариант 20, Сергеев Владимир")
 
-    axes_limit = radius_values.max() * 2
+    axes_limit = max(radius_values.max(), .1) * 3
     region.set_xlim(-axes_limit, axes_limit)
     region.set_ylim(-axes_limit, axes_limit)
-    # We will set the value to "image" in order to comply with the established limits and avoid distortions.
+    # We will set the value to 'image' in order to comply with the established limits and avoid distortions.
     region.axis('image')
 
-    curve, = region.plot(np.array([]), np.array([]))  # Trajectory
-    particle, = region.plot(np.array([]), np.array([]), marker='o')  # Point particle
-    displayed_radius, = region.plot(np.array([]), np.array([]), color='black', linestyle=':')  # Position vector
-    velocity_arrow = Arrow('red')  # Velocity vector
-    acceleration_arrow = Arrow(color='purple', line_style=':')  # Acceleration vector
-    tangential_acceleration_arrow = Arrow(color='green', line_style='--')  # Tangential acceleration vector
-    centripetal_acceleration_arrow = Arrow(color='blue', line_style='--')  # Centripetal acceleration vector
+    all_objects = DisplayGroup()
 
     plt.xlabel('x')
     plt.ylabel('y')
-    handles = [displayed_radius,
-               velocity_arrow.return_plot(),
-               acceleration_arrow.return_plot(),
-               tangential_acceleration_arrow.return_plot(),
-               centripetal_acceleration_arrow.return_plot()
-               ]
-    labels = ['Радиус-вектор',
-              'Вектор скорости',
-              'Вектор полного ускорения',
-              'Вектор тангенциального ускорения',
-              'Вектор нормального ускорения'
-              ]
-    plt.legend(handles=handles, labels=labels, loc='lower left', fontsize='xx-small')
 
-    FPS = 60  # Frames per second
+    plt.legend(handles=all_objects.return_plots_for_legend(), labels=all_objects.return_names_for_legend(),
+               loc='lower left', fontsize='x-small')
 
 
     def animate(i):
-        if i == time_points.size:
-            ani.event_source.stop()
-            print("Симуляция успешно завершена")
-            return (curve, particle, displayed_radius,
-                    *velocity_arrow.return_plot(),
-                    *acceleration_arrow.return_plot(),
-                    *tangential_acceleration_arrow.return_plot(), *centripetal_acceleration_arrow.return_plot())
-
         x, y = polar_coordinates_to_cartesian(radius_values[:i + 1], angle_values[:i + 1])
-
-        curve.set_data(x, y)
-        particle.set_data(np.array([x[-1]]), np.array([y[-1]]))
-        displayed_radius.set_data(np.array([0, x[-1]]), np.array([0, y[-1]]))
-
-        # Velocity vectors visualization
-        velocity_x, velocity_y = polar_vector_to_cartesian(radius_velocity_values[i], angle_velocity_values[i],
-                                                           radius_values[i], angle_values[i])
-        velocity_arrow.update(x[-1], y[-1], x[-1] + velocity_x, y[-1] + velocity_y)
-
-        # Acceleration vectors visualization
-        acceleration_x, acceleration_y = polar_vector_to_cartesian(
-            radius_acceleration_values[i], angle_acceleration_values[i],
-            radius_values[i], angle_values[i])
-        acceleration_arrow.update(x[-1], y[-1], x[-1] + acceleration_x, y[-1] + acceleration_y)
-
-        tangential_x, tangential_y, tangential = calculate_tangential_acceleration(acceleration_x, acceleration_y,
-                                                                                   velocity_x, velocity_y)
-        tangential_acceleration_arrow.update(x[-1], y[-1], x[-1] + tangential_x, y[-1] + tangential_y)
-
-        centripetal_x, centripetal_y, _ = calculate_centripetal_acceleration(tangential,
-                                                                             acceleration_x, acceleration_y,
-                                                                             velocity_x, velocity_y)
-        centripetal_acceleration_arrow.update(x[-1], y[-1], x[-1] + centripetal_x, y[-1] + centripetal_y)
-
-        return (curve, particle, displayed_radius,
-                *velocity_arrow.return_plot(),
-                *acceleration_arrow.return_plot(),
-                *tangential_acceleration_arrow.return_plot(), *centripetal_acceleration_arrow.return_plot())
+        velocity_x, velocity_y, velocity = polar_velocity_to_cartesian(radius_velocity_values[i],
+                                                                       angle_velocity_values[i],
+                                                                       radius_values[i], angle_values[i])
+        acceleration_x, acceleration_y, acceleration = polar_acceleration_to_cartesian(radius_acceleration_values[i],
+                                                                                       angle_acceleration_values[i],
+                                                                                       radius_velocity_values[i],
+                                                                                       angle_velocity_values[i],
+                                                                                       radius_values[i],
+                                                                                       angle_values[i])
+        tangential_x, tangential_y, _ = calculate_tangential_acceleration(acceleration_x, acceleration_y,
+                                                                          velocity_x, velocity_y)
+        centripetal_x, centripetal_y, centripetal = calculate_centripetal_acceleration(acceleration_x, acceleration_y,
+                                                                                       tangential_x, tangential_y)
+        curvature_radius_x, curvature_radius_y, _ = calculate_curvature_radius(velocity, centripetal, centripetal_x,
+                                                                               centripetal_y)
+        all_objects.update(x=x, y=y, velocity_x=velocity_x, velocity_y=velocity_y, acceleration_x=acceleration_x,
+                           acceleration_y=acceleration_y, tangential_x=tangential_x, tangential_y=tangential_y,
+                           centripetal_x=centripetal_x, centripetal_y=centripetal_y,
+                           curvature_radius_x=curvature_radius_x, curvature_radius_y=curvature_radius_y)
+        return all_objects.return_plots()
 
 
-    ani = animation.FuncAnimation(window, animate, frames=time_points.size + 1, interval=round(1000 / FPS), blit=True)
+    ani = FuncAnimation(window, animate, frames=STEPS, interval=round(1000 / FPS), repeat=False, blit=True)
     plt.show()
+    print("Симуляция успешно завершена.")
